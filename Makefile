@@ -28,6 +28,8 @@ SHELL := /bin/bash
 BASE_BRANCH ?= main
 CURRENT_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 BASE_SHA ?= $(shell git merge-base remotes/origin/$(BASE_BRANCH) HEAD)
+GIT_USER_NAME ?= $(shell git config user.name)
+GIT_USER_EMAIL ?= $(shell git config user.email)
 
 #
 # Variables to be used by docker commands
@@ -36,6 +38,13 @@ DOCKER ?= $(shell which docker)
 DOCKER_BUILD ?= $(DOCKER) build -t $(<F) $<
 DOCKER_RUN ?= $(DOCKER) run -i --rm -v $(CURDIR):/work -w /work
 DOCKER_RMI ?= $(DOCKER) rmi
+
+#
+# Variables to be used by standard-version commands
+#
+STANDARD_VERSION ?= $(DOCKER_RUN) -v "$${TMPDIR}:/work/.git/hooks" \
+                    -e GIT_COMMITTER_NAME="$(GIT_USER_NAME)" -e GIT_COMMITTER_EMAIL="$(GIT_USER_EMAIL)" \
+                    -e GIT_AUTHOR_NAME="$(GIT_USER_NAME)" -e GIT_AUTHOR_EMAIL="$(GIT_USER_EMAIL)" standard-version
 
 #
 # All
@@ -47,7 +56,7 @@ all: clean build test ## run clean, build and test
 # Build docker images
 #
 .PHONY: build
-build: build-prettier build-markdownlint build-yamllint build-jsonlint build-write-good build-proselint build-alex ## build all docker images
+build: build-prettier build-markdownlint build-yamllint build-jsonlint build-write-good build-proselint build-alex build-standard-version ## build all docker images
 
 .PHONY: build-prettier
 build-prettier: dockerfiles/prettier ## docker build for prettier
@@ -75,6 +84,10 @@ build-proselint: dockerfiles/proselint ## docker build for proselint
 
 .PHONY: build-alex
 build-alex: dockerfiles/alex ## docker build for alex
+	$(DOCKER_BUILD)
+
+.PHONY: build-standard-version
+build-standard-version: dockerfiles/standard-version ## docker build for standard-version
 	$(DOCKER_BUILD)
 
 #
@@ -119,6 +132,17 @@ test-writing: ## test writing by write-good, proselint and alex
 	$(DOCKER_RUN) alex '**/*.md'
 
 #
+# Bump version
+#
+.PHONY: bump-minor
+bump-minor: ## Bump minor version and generate CHANGELOG.md
+	$(STANDARD_VERSION) --release-as minor
+
+.PHONY: bump-patch
+bump-patch: ## Bump patch version and generate CHANGELOG.md
+	$(STANDARD_VERSION) --release-as patch
+
+#
 # Clean
 #
 .PHONY: clean
@@ -130,6 +154,7 @@ clean: ## docker rmi for all images
 	$(DOCKER_RMI) write-good
 	$(DOCKER_RMI) proselint
 	$(DOCKER_RMI) alex
+	$(DOCKER_RMI) standard-version
 
 # Self-Documented Makefile
 # https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
