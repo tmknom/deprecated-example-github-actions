@@ -2,7 +2,7 @@ name: Debug after merged
 on:
   pull_request:
     branches:
-      - master
+      - main
     types: [closed]
 
 jobs:
