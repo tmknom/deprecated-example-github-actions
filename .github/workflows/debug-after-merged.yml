@@ -1,0 +1,18 @@
+name: Debug after merged
+on:
+  pull_request:
+    branches:
+      - master
+    types: [closed]
+
+jobs:
+  context:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        if: ${{ github.event.pull_request.merged && startsWith(github.head_ref, 'release-') }}
+        run: echo "${GITHUB_CONTEXT}"
