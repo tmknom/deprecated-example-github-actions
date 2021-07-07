@@ -11,8 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJSON(github) }}
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Echo tag
         if: ${{ github.event.pull_request.merged && startsWith(github.head_ref, 'release-') }}
-        run: echo "${GITHUB_CONTEXT}"
+        run: |
+          set -x
+          git fetch --tag
+          LATEST_TAG=$(git tag --sort=-v:refname | head -1)
+          echo "${LATEST_TAG}"
