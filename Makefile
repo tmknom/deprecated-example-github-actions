@@ -174,7 +174,7 @@ test-bump-patch: ## Bump patch version and generate CHANGELOG.md
 	$(STANDARD_VERSION) --release-as patch && \
 	git push --follow-tags origin release-$(NEXT_PATCH_VERSION)
 
-FIRST_VERSION ?= 0.1.0
+FIRST_VERSION ?= v0.1.0
 .PHONY: test-bump-first
 test-bump-first: ## Bump first version and generate CHANGELOG.md
 	git checkout -b release-$(FIRST_VERSION) && \
