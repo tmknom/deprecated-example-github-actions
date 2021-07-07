@@ -170,28 +170,12 @@ clean: ## docker rmi for all images
 help: ## show help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: test-bump-minor
-test-bump-minor: ## Bump minor version and generate CHANGELOG.md
-	git checkout -b release-$(NEXT_MINOR_VERSION) && \
-	$(STANDARD_VERSION) --release-as minor && \
-	git push --follow-tags origin release-$(NEXT_MINOR_VERSION)
-
-.PHONY: test-bump-patch
-test-bump-patch: ## Bump patch version and generate CHANGELOG.md
-	git checkout -b release-$(NEXT_PATCH_VERSION) && \
-	$(STANDARD_VERSION) --release-as patch && \
-	git push --follow-tags origin release-$(NEXT_PATCH_VERSION)
-
 FIRST_VERSION ?= v0.1.0
 .PHONY: test-bump-first
 test-bump-first: ## Bump first version and generate CHANGELOG.md
 	git checkout -b release-$(FIRST_VERSION) && \
 	$(STANDARD_VERSION) --release-as 0.1.0 && \
 	git push --follow-tags origin release-$(FIRST_VERSION)
-
-NEXT_MINOR_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as minor | $(GREP_AND_CUT))
-NEXT_PATCH_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as patch | $(GREP_AND_CUT))
-GREP_AND_CUT ?= grep tagging | cut -d " " -f 4
 
 #
 # Merge upstream repository
