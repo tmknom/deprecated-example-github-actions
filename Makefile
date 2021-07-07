@@ -184,3 +184,14 @@ test-bump-first: ## Bump first version and generate CHANGELOG.md
 NEXT_MINOR_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as minor | $(GREP_AND_CUT))
 NEXT_PATCH_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as patch | $(GREP_AND_CUT))
 GREP_AND_CUT ?= grep tagging | cut -d " " -f 4
+
+#
+# Merge upstream repository
+#
+.PHONY: merge-upstream
+merge-upstream: ## Merge upstream repository
+	git fetch upstream
+	git checkout remotes/upstream/main
+	git checkout -b chore-merge-upstream
+	git rebase main
+	git push origin chore-merge-upstream
