@@ -183,4 +183,4 @@ test-bump-first: ## Bump first version and generate CHANGELOG.md
 
 NEXT_MINOR_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as minor | $(GREP_AND_CUT))
 NEXT_PATCH_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as patch | $(GREP_AND_CUT))
-GREP_AND_CUT ?= grep tagging | cut -d " " -f 4 | cut -d "v" -f 2
+GREP_AND_CUT ?= grep tagging | cut -d " " -f 4
