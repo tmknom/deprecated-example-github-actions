@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://github.com/tmknom/example-github-actions/compare/v0.1.0...v0.2.0) (2021-07-08)
+
+
+### Bug Fixes
+
+* update body creation step ([0677d31](https://github.com/tmknom/example-github-actions/commit/0677d3135123d07c5e3d524442c42c8fcb1c6cdc))
+
 ## 0.1.0 (2021-07-08)
 
 
