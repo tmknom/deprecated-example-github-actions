@@ -170,13 +170,6 @@ clean: ## docker rmi for all images
 help: ## show help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-FIRST_VERSION ?= v0.1.0
-.PHONY: test-bump-first
-test-bump-first: ## Bump first version and generate CHANGELOG.md
-	git checkout -b release-$(FIRST_VERSION) && \
-	$(STANDARD_VERSION) --release-as 0.1.0 && \
-	git push --follow-tags origin release-$(FIRST_VERSION)
-
 #
 # Merge upstream repository
 #
