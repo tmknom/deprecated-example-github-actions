@@ -30,6 +30,7 @@ include subrepository.mk
 #
 DOCKERFILES ?= $(shell ls dockerfiles | sort)
 BUILD_TARGETS ?= $(patsubst %,build-%,$(DOCKERFILES))
+CLEAN_TARGETS ?= $(patsubst %,clean-%,$(DOCKERFILES))
 
 #
 # Variables for the current git attributes
