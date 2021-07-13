@@ -19,6 +19,9 @@ SHELL := /bin/bash
 # Disable any builtin suffix rules, then speedup a bit.
 .SUFFIXES:
 
+# Include another makefile
+include subrepository.mk
+
 # Sets the default goal to be used if no targets were specified on the command line.
 .DEFAULT_GOAL := help
 
@@ -175,14 +178,3 @@ clean: ## docker rmi for all images
 .PHONY: help
 help: ## show help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
-#
-# Merge upstream repository
-#
-.PHONY: merge-upstream
-merge-upstream: ## Merge upstream repository
-	git fetch upstream
-	git checkout remotes/upstream/main
-	git checkout -b chore-merge-upstream
-	git rebase main
-	git push origin chore-merge-upstream
