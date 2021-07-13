@@ -1,0 +1,48 @@
+name: Debug Comment
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context:
+    name: Debug comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: testing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        run: echo "$GITHUB_CONTEXT"
+      - name: GitHub CLI
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
+          gh pr list
+          gh run list
+#      - name: Dump runner context
+#        id: main
+#        run: |
+#          EXIT_CODE=0
+#          RESULT=$(echo "error!\nerror!!\nerror!!!" 2>&1)
+#          echo ${RESULT}
+#          EXIT_CODE=25  # EXIT_CODE=$?
+#          if [ ! "${EXIT_CODE}" = "0" ]; then
+#            echo "::set-output name=result::${RESULT//$'\n'/\\n}"
+#            exit ${EXIT_CODE}
+#          fi
+#      - name: Comment to pull request
+#        if: failure()
+#        uses: actions/github-script@v4
+#        with:
+#          script: |
+#            github.issues.createComment({
+#              issue_number: context.issue.number,
+#              owner: context.repo.owner,
+#              repo: context.repo.repo,
+#              body: "${{ steps.main.outputs.result }}"
+#            });
