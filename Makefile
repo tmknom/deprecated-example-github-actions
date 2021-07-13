@@ -26,6 +26,13 @@ include subrepository.mk
 .DEFAULT_GOAL := help
 
 #
+# Variables for the phony targets
+#
+DOCKERFILES ?= $(shell ls dockerfiles | sort)
+BUILD_TARGETS ?= $(patsubst %,build-%,$(DOCKERFILES))
+CLEAN_TARGETS ?= $(patsubst %,clean-%,$(DOCKERFILES))
+
+#
 # Variables for the current git attributes
 #
 BASE_BRANCH ?= main
@@ -40,7 +47,11 @@ GIT_USER_EMAIL ?= $(shell git config user.email)
 DOCKER ?= $(shell which docker)
 DOCKER_BUILD ?= $(DOCKER) build -t $(<F) $<
 DOCKER_RUN ?= $(DOCKER) run -i --rm -v $(CURDIR):/work -w /work
-DOCKER_RMI ?= $(DOCKER) rmi
+
+#
+# Variables to be used by test writing
+#
+MARKDOWN_FILES ?= $(shell find . -not -path './CHANGELOG.md' -name '*.md')
 
 #
 # Variables to be used by standard-version commands
@@ -49,9 +60,23 @@ STANDARD_VERSION ?= $(DOCKER_RUN) -v "$${TMPDIR}:/work/.git/hooks" \
                     -e GIT_COMMITTER_NAME="$(GIT_USER_NAME)" -e GIT_COMMITTER_EMAIL="$(GIT_USER_EMAIL)" \
                     -e GIT_AUTHOR_NAME="$(GIT_USER_NAME)" -e GIT_AUTHOR_EMAIL="$(GIT_USER_EMAIL)" standard-version
 
-NEXT_MINOR_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as minor | $(GREP_AND_CUT_TAG))
-NEXT_PATCH_VERSION ?= $(shell $(STANDARD_VERSION) --dry-run --release-as patch | $(GREP_AND_CUT_TAG))
-GREP_AND_CUT_TAG ?= grep tagging | cut -d " " -f 4
+#
+# Macros to be used by standard-version commands
+#
+define bump
+	@release_type="$(1)" && \
+	dry_run=$$($(STANDARD_VERSION) --dry-run --release-as $${release_type}) && \
+	version=$$(echo "$${dry_run}" | grep tagging | cut -d " " -f 4) && \
+	branch=release-$${version} && \
+	set -x && \
+	$(STANDARD_VERSION) --skip.commit --skip.tag --release-as $${release_type} && \
+	$(MAKE) format-markdown && \
+	git checkout -b $${branch} && \
+	git add CHANGELOG.md && \
+	git commit -m "chore(release): $${version}" && \
+	git tag $${version} && \
+	git push origin $${branch} $${version}
+endef
 
 #
 # All
@@ -63,39 +88,11 @@ all: clean build test ## run clean, build and test
 # Build docker images
 #
 .PHONY: build
-build: build-prettier build-markdownlint build-yamllint build-jsonlint build-write-good build-proselint build-alex build-standard-version ## build all docker images
+build: $(BUILD_TARGETS) ## build all images
 
-.PHONY: build-prettier
-build-prettier: dockerfiles/prettier ## docker build for prettier
-	$(DOCKER_BUILD)
-
-.PHONY: build-markdownlint
-build-markdownlint: dockerfiles/markdownlint ## docker build for markdownlint
-	$(DOCKER_BUILD)
-
-.PHONY: build-yamllint
-build-yamllint: dockerfiles/yamllint ## docker build for yamllint
-	$(DOCKER_BUILD)
-
-.PHONY: build-jsonlint
-build-jsonlint: dockerfiles/jsonlint ## docker build for jsonlint
-	$(DOCKER_BUILD)
-
-.PHONY: build-write-good
-build-write-good: dockerfiles/write-good ## docker build for write-good
-	$(DOCKER_BUILD)
-
-.PHONY: build-proselint
-build-proselint: dockerfiles/proselint ## docker build for proselint
-	$(DOCKER_BUILD)
-
-.PHONY: build-alex
-build-alex: dockerfiles/alex ## docker build for alex
-	$(DOCKER_BUILD)
-
-.PHONY: build-standard-version
-build-standard-version: dockerfiles/standard-version ## docker build for standard-version
-	$(DOCKER_BUILD)
+.PHONY: $(BUILD_TARGETS)
+$(BUILD_TARGETS):
+	IMAGE_NAME=$(patsubst build-%,%,$@) && $(DOCKER) build -t $${IMAGE_NAME} dockerfiles/$${IMAGE_NAME}
 
 #
 # Tests
@@ -104,8 +101,10 @@ build-standard-version: dockerfiles/standard-version ## docker build for standar
 test: test-dockerfile test-shell test-markdown test-yaml test-json test-secret test-writing ## test all
 
 .PHONY: test-dockerfile
-test-dockerfile: ## test dockerfile by hadolint
+test-dockerfile: ## test dockerfile by hadolint and dockerfilelint
 	find . -name Dockerfile | xargs $(DOCKER_RUN) hadolint/hadolint hadolint
+	find . -name Dockerfile | xargs $(DOCKER_RUN) replicated/dockerfilelint
+	$(DOCKER_RUN) bridgecrew/checkov --quiet -d .
 
 .PHONY: test-shell
 test-shell: ## test shell by shellcheck and shfmt
@@ -113,9 +112,14 @@ test-shell: ## test shell by shellcheck and shfmt
 	$(DOCKER_RUN) mvdan/shfmt -i 2 -ci -bn -d .
 
 .PHONY: test-markdown
-test-markdown: ## test markdown by markdownlint and prettier
+test-markdown: ## test markdown by markdownlint, remark and prettier
 	$(DOCKER_RUN) markdownlint --dot **/*.md
+	$(DOCKER_RUN) remark --silently-ignore **/*.md
 	$(DOCKER_RUN) prettier --check --parser=markdown **/*.md
+
+.PHONY: test-makefile
+test-makefile: ## test makefile by checkmake
+	find . -name Makefile | xargs -I {} $(DOCKER_RUN) checkmake {}
 
 .PHONY: test-yaml
 test-yaml: ## test yaml by yamllint and prettier
@@ -134,47 +138,89 @@ test-secret: ## test secret by secretlint
 
 .PHONY: test-writing
 test-writing: ## test writing by write-good, proselint and alex
-	find . -name '*.md' | xargs $(DOCKER_RUN) write-good
-	find . -name '*.md' | xargs $(DOCKER_RUN) proselint
-	$(DOCKER_RUN) alex '**/*.md'
+	$(DOCKER_RUN) write-good $(MARKDOWN_FILES)
+	$(DOCKER_RUN) proselint $(MARKDOWN_FILES)
+	$(DOCKER_RUN) alex $(MARKDOWN_FILES)
+
+#
+# Format code
+#
+.PHONY: format
+format: format-shell format-markdown format-yaml format-json ## format all
+
+.PHONY: format-shell
+format-shell: ## format shell by shfmt
+	$(DOCKER_RUN) mvdan/shfmt -i 2 -ci -bn -w .
+
+.PHONY: format-markdown
+format-markdown: ## format markdown by prettier
+	$(DOCKER_RUN) prettier --write --parser=markdown **/*.md
+
+.PHONY: format-yaml
+format-yaml: ## format yaml by prettier
+	$(DOCKER_RUN) prettier --write --parser=yaml **/*.y*ml
+
+.PHONY: format-json
+format-json: ## format json by prettier
+	$(DOCKER_RUN) prettier --write --parser=json **/*.json
 
 #
 # Bump version
 #
+.PHONY: bump-major
+bump-major: ## bump major version and generate CHANGELOG.md
+	$(call bump,major)
+
 .PHONY: bump-minor
-bump-minor: ## Bump minor version and generate CHANGELOG.md
-	git checkout -b release-$(NEXT_MINOR_VERSION) && \
-	$(STANDARD_VERSION) --release-as minor && \
-	git push --follow-tags origin release-$(NEXT_MINOR_VERSION)
+bump-minor: ## bump minor version and generate CHANGELOG.md
+	$(call bump,minor)
 
 .PHONY: bump-patch
-bump-patch: ## Bump patch version and generate CHANGELOG.md
-	git checkout -b release-$(NEXT_PATCH_VERSION) && \
-	$(STANDARD_VERSION) --release-as patch && \
-	git push --follow-tags origin release-$(NEXT_PATCH_VERSION)
+bump-patch: ## bump patch version and generate CHANGELOG.md
+	$(call bump,patch)
 
 .PHONY: bump-first
-bump-first: ## Bump first version and generate CHANGELOG.md
-	git checkout -b release-v0.1.0 && \
-	$(STANDARD_VERSION) --release-as 0.1.0 && \
-	git push --follow-tags origin release-v0.1.0
+bump-first: ## bump first version and generate CHANGELOG.md
+	$(call bump,v0.1.0)
+
+#
+# Manage documents
+#
+.PHONY: docs
+docs: ## manage documents
+	$(DOCKER_RUN) --entrypoint=/app/gh-md-toc evkalinin/gh-md-toc:0.7.0 --insert --no-backup README.md
+	$(MAKE) format-markdown
 
 #
 # Clean
 #
 .PHONY: clean
-clean: ## docker rmi for all images
-	$(DOCKER_RMI) prettier
-	$(DOCKER_RMI) markdownlint
-	$(DOCKER_RMI) yamllint
-	$(DOCKER_RMI) jsonlint
-	$(DOCKER_RMI) write-good
-	$(DOCKER_RMI) proselint
-	$(DOCKER_RMI) alex
-	$(DOCKER_RMI) standard-version
+clean: $(CLEAN_TARGETS) ## docker rmi for all images
 
-# Self-Documented Makefile
-# https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+.PHONY: $(CLEAN_TARGETS)
+$(CLEAN_TARGETS):
+	IMAGE_NAME=$(patsubst clean-%,%,$@) && $(DOCKER) rmi $${IMAGE_NAME}
+
+#
+# Help
+#
+.PHONY: help-all
+help-all: ## show help all
+	@printf "\033[35mGeneral targets:\033[0m\n"
+	@$(MAKE) help
+	@printf "\n\033[35mBuild specified images:\033[0m\n"
+	@$(MAKE) help-build
+	@printf "\n\033[35mClean specified images:\033[0m\n"
+	@$(MAKE) help-clean
+
 .PHONY: help
 help: ## show help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: help-build
+help-build:
+	@echo $(BUILD_TARGETS) | sed 's/ /\n/g' | sort | awk '{s=$$1; sub(/-/," ",s); printf "\033[36m%-30s\033[0m %s image\n", $$1, s}'
+
+.PHONY: help-clean
+help-clean:
+	@echo $(CLEAN_TARGETS) | sed 's/ /\n/g' | sort | awk '{s=$$1; sub(/-/," ",s); printf "\033[36m%-30s\033[0m %s image\n", $$1, s}'

@@ -2,18 +2,18 @@ name: Test Markdown
 on:
   push:
     branches:
+      - release-*
       - test-github-actions
   pull_request:
     paths:
       - '**.md'
-      - '!CHANGELOG.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint:
+  markdownlint:
     name: Lint by markdownlint
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -27,7 +27,24 @@ jobs:
       - name: Run markdownlint
         run: markdownlint --dot '**/*.md'
 
-  format:
+  remark:
+    name: Lint by remark
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install remark
+        run: |
+          sudo npm install -g remark-cli remark-lint remark-preset-lint-markdown-style-guide \
+          remark-preset-lint-recommended remark-preset-lint-consistent \
+          remark-lint-list-item-spacing remark-lint-list-item-indent remark-lint-maximum-line-length
+      - name: Display remark
+        run: remark --version
+      - name: Run remark
+        run: remark --frail --silently-ignore '**/*.md'
+
+  prettier:
     name: Format by prettier
     runs-on: ubuntu-latest
     timeout-minutes: 5

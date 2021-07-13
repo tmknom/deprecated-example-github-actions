@@ -2,6 +2,7 @@ name: Test Commit
 on:
   push:
     branches:
+      - release-*
       - test-github-actions
   pull_request:
 
@@ -10,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  commitlint:
     name: Lint by commitlint
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -28,6 +29,7 @@ jobs:
       - name: Run commitlint
         run: commitlint --from $(git merge-base origin/main HEAD) --to ${{ github.sha }} --verbose
       - name: Run commitlint for pull request
+        if: ${{ github.event_name == 'pull_request' }}
         run: echo "${TITLE}" | commitlint --verbose
         env:
           TITLE: ${{ github.event.pull_request.title }}

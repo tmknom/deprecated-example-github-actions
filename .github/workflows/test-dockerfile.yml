@@ -2,6 +2,7 @@ name: Test Dockerfile
 on:
   push:
     branches:
+      - release-*
       - test-github-actions
   pull_request:
     paths:
@@ -12,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  hadolint:
     name: Lint by hadolint
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -25,3 +26,31 @@ jobs:
         run: docker run --rm hadolint/hadolint hadolint --version
       - name: Run hadolint
         run: find . -name Dockerfile | xargs docker run --rm -v $(pwd):/work -w /work hadolint/hadolint hadolint
+
+  dockerfilelint:
+    name: Lint by dockerfilelint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install dockerfilelint
+        run: docker pull replicated/dockerfilelint
+      - name: Display dockerfilelint
+        run: docker run --rm replicated/dockerfilelint --version
+      - name: Run dockerfilelint
+        run: find . -name Dockerfile | xargs docker run --rm -v $(pwd):/work -w /work replicated/dockerfilelint
+
+  checkov:
+    name: Lint by checkov
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install checkov
+        run: docker pull bridgecrew/checkov
+      - name: Display checkov
+        run: docker run --rm bridgecrew/checkov --version
+      - name: Run checkov
+        run: docker run --rm -v $(pwd):/work -w /work bridgecrew/checkov --quiet -d .
